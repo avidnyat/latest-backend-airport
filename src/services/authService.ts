@@ -1,7 +1,4 @@
-
-// Authentication service using PostgreSQL backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
-
+// Mock Authentication service for frontend-only implementation
 export interface User {
   id: string;
   email: string;
@@ -20,52 +17,69 @@ export interface AuthResponse {
   session: Session;
 }
 
-// Helper function to handle API responses
-const handleResponse = async (response: Response) => {
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+// Mock users database (in a real app, this would be in your backend)
+const mockUsers: User[] = [
+  {
+    id: '1',
+    email: 'admin@fcb.com',
+    full_name: 'Admin User',
+    role: 'admin',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: '2',
+    email: 'staff@fcb.com',
+    full_name: 'Staff User',
+    role: 'staff',
+    created_at: new Date().toISOString()
   }
-  
-  return data;
+];
+
+// Mock passwords (in a real app, these would be hashed and stored securely)
+const mockPasswords: Record<string, string> = {
+  'admin@fcb.com': 'admin123',
+  'staff@fcb.com': 'staff123'
 };
 
-// Helper function to make authenticated API calls
-const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-  const url = `${API_BASE_URL}${endpoint}`;
-  console.log(`API Call: ${options.method || 'GET'} ${url}`);
-  
-  const token = localStorage.getItem('auth_token');
-  
-  const defaultOptions: RequestInit = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
-    },
-  };
-  
-  const response = await fetch(url, { ...defaultOptions, ...options });
-  return handleResponse(response);
+// Helper function to simulate API delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper function to generate mock token
+const generateMockToken = () => {
+  return 'mock_token_' + Math.random().toString(36).substr(2, 9);
+};
+
+// Helper function to generate session expiry (24 hours from now)
+const generateSessionExpiry = () => {
+  const expiry = new Date();
+  expiry.setHours(expiry.getHours() + 24);
+  return expiry.toISOString();
 };
 
 export const signIn = async (email: string, password: string): Promise<AuthResponse> => {
   console.log('Signing in user:', email);
   
-  const response = await apiCall('/auth/signin', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
-
-  // Store token in localStorage
-  if (response.session?.access_token) {
-    localStorage.setItem('auth_token', response.session.access_token);
-    localStorage.setItem('auth_expires_at', response.session.expires_at);
-    localStorage.setItem('auth_user', JSON.stringify(response.user));
-    console.log('Session stored successfully');
+  // Simulate API delay
+  await delay(500);
+  
+  // Check if user exists and password is correct
+  const user = mockUsers.find(u => u.email === email);
+  if (!user || mockPasswords[email] !== password) {
+    throw new Error('Invalid email or password');
   }
 
-  return response;
+  const session: Session = {
+    access_token: generateMockToken(),
+    expires_at: generateSessionExpiry()
+  };
+
+  // Store token in localStorage
+  localStorage.setItem('auth_token', session.access_token);
+  localStorage.setItem('auth_expires_at', session.expires_at);
+  localStorage.setItem('auth_user', JSON.stringify(user));
+  console.log('Session stored successfully');
+
+  return { user, session };
 };
 
 export const signUp = async (
@@ -76,48 +90,80 @@ export const signUp = async (
 ): Promise<AuthResponse> => {
   console.log('Signing up user:', email, 'with role:', role);
   
-  const response = await apiCall('/auth/signup', {
-    method: 'POST',
-    body: JSON.stringify({ email, password, fullName, role }),
-  });
-
-  // Store token in localStorage
-  if (response.session?.access_token) {
-    localStorage.setItem('auth_token', response.session.access_token);
-    localStorage.setItem('auth_expires_at', response.session.expires_at);
-    localStorage.setItem('auth_user', JSON.stringify(response.user));
-    console.log('Session stored successfully');
+  // Simulate API delay
+  await delay(500);
+  
+  // Check if user already exists
+  if (mockUsers.find(u => u.email === email)) {
+    throw new Error('User already exists');
   }
 
-  return response;
+  // Create new user
+  const newUser: User = {
+    id: (mockUsers.length + 1).toString(),
+    email,
+    full_name: fullName,
+    role,
+    created_at: new Date().toISOString()
+  };
+
+  // Add to mock database
+  mockUsers.push(newUser);
+  mockPasswords[email] = password;
+
+  const session: Session = {
+    access_token: generateMockToken(),
+    expires_at: generateSessionExpiry()
+  };
+
+  // Store token in localStorage
+  localStorage.setItem('auth_token', session.access_token);
+  localStorage.setItem('auth_expires_at', session.expires_at);
+  localStorage.setItem('auth_user', JSON.stringify(newUser));
+  console.log('Session stored successfully');
+
+  return { user: newUser, session };
 };
 
 export const signOut = async (): Promise<void> => {
   console.log('Signing out user');
   
-  try {
-    await apiCall('/auth/signout', {
-      method: 'POST',
-    });
-  } catch (error) {
-    console.error('Error during signout:', error);
-  } finally {
-    // Always clear local storage
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_expires_at');
-    localStorage.removeItem('auth_user');
-    console.log('Local session cleared');
-  }
+  // Simulate API delay
+  await delay(200);
+  
+  // Clear local storage
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_expires_at');
+  localStorage.removeItem('auth_user');
+  console.log('Local session cleared');
 };
 
 export const getCurrentUser = async (): Promise<User | null> => {
   try {
-    const response = await apiCall('/auth/user');
-    console.log('Current user fetched:', response.user);
-    return response.user;
+    // Simulate API delay
+    await delay(200);
+    
+    const userStr = localStorage.getItem('auth_user');
+    const token = localStorage.getItem('auth_token');
+    const expiresAt = localStorage.getItem('auth_expires_at');
+
+    if (!userStr || !token || !expiresAt) {
+      return null;
+    }
+
+    // Check if session has expired
+    if (new Date() >= new Date(expiresAt)) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_expires_at');
+      localStorage.removeItem('auth_user');
+      return null;
+    }
+
+    const user = JSON.parse(userStr);
+    console.log('Current user fetched:', user);
+    return user;
   } catch (error) {
     console.error('Error getting current user:', error);
-    // Clear invalid session
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_expires_at');
     localStorage.removeItem('auth_user');
@@ -127,23 +173,60 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
 export const getAllUsers = async (): Promise<User[]> => {
   console.log('Fetching all users');
-  const response = await apiCall('/auth/users');
-  return response;
+  
+  // Simulate API delay
+  await delay(300);
+  
+  // Return copy of mock users (excluding current session user to avoid confusion)
+  return [...mockUsers];
 };
 
 export const updateUser = async (id: string, userData: { fullName: string; role: string }): Promise<User> => {
   console.log('Updating user:', id);
-  return apiCall(`/auth/users/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(userData),
-  });
+  
+  // Simulate API delay
+  await delay(400);
+  
+  const userIndex = mockUsers.findIndex(u => u.id === id);
+  if (userIndex === -1) {
+    throw new Error('User not found');
+  }
+
+  // Update user
+  mockUsers[userIndex] = {
+    ...mockUsers[userIndex],
+    full_name: userData.fullName,
+    role: userData.role
+  };
+
+  // Update stored user if it's the current user
+  const storedUser = localStorage.getItem('auth_user');
+  if (storedUser) {
+    const currentUser = JSON.parse(storedUser);
+    if (currentUser.id === id) {
+      localStorage.setItem('auth_user', JSON.stringify(mockUsers[userIndex]));
+    }
+  }
+
+  return mockUsers[userIndex];
 };
 
 export const deleteUser = async (id: string): Promise<void> => {
   console.log('Deleting user:', id);
-  await apiCall(`/auth/users/${id}`, {
-    method: 'DELETE',
-  });
+  
+  // Simulate API delay
+  await delay(400);
+  
+  const userIndex = mockUsers.findIndex(u => u.id === id);
+  if (userIndex === -1) {
+    throw new Error('User not found');
+  }
+
+  const userEmail = mockUsers[userIndex].email;
+  
+  // Remove user from mock database
+  mockUsers.splice(userIndex, 1);
+  delete mockPasswords[userEmail];
 };
 
 // Session management helpers
